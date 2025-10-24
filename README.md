@@ -179,14 +179,20 @@ FileNotFoundError: 이미지 파일을 찾을 수 없습니다
 - **Anthropic Claude API** - 이미지 분석 및 텍스트 생성
 - **python-dotenv** - 환경변수 관리
 
-## 라이선스
+## Streamlit 버전 업그레이드
 
-MIT License
+  - 앱 실행:
+    ```bash
+    streamlit run app.py
+    ```
+- 사용법:
+  - 사이드바에서 `ANTHROPIC_API_KEY` 입력 또는 `.env` 사용.
+  - 이미지 업로드 → [선택 이미지 분석 및 저장] 클릭.
+  - 하단 표에서 보기 모드(플랫/원본 JSON) 전환.
+  - id 쉼표입력 후 복사/JSON 다운로드/선택 삭제 가능. 새로고침 버튼 제공.
 
-## 기여
+변경 규모: 중간
 
-이슈나 풀 리퀘스트는 언제든지 환영합니다!
-
-## 문의
-
-문제가 있거나 질문이 있으시면 이슈를 등록해 주세요.
+요약:
+- `app.py` 추가: 업로드→Anthropic 분석→`results.jsonl` 저장, 테이블 뷰, 복사/다운로드/삭제, 새로고침.
+- `requirements.txt` 업데이트: `streamlit`, `pandas` 추가.
