@@ -20,6 +20,50 @@ load_dotenv()
 class DressPromptGenerator:
     """드레스 이미지 분석 및 프롬프트 생성 클래스"""
 
+    # 허용 어휘 목록 (시스템 검증용)
+    ALLOWED_LINES = ["티렝스", "미니", "A라인", "엠파이어라인", "시스", "H라인", "머메이드", "벨라인", "볼가운", "프린세스라인"]
+    ALLOWED_MATERIALS = ["비즈", "새틴", "미카도실크", "오간자", "레이스", "쉬폰", "튤(망사)", "도비실크", "크레이프"]
+    ALLOWED_NECKLINES = ["브이넥", "하트넥", "오프숄더", "하이넥", "보트넥", "스퀘어넥", "일루전 넥", "스트레이트 어크로스", "언밸런스"]
+    ALLOWED_SLEEVES = ["롱슬리브", "7부", "숏슬리브", "일루전슬리브", "비숍슬리브", "벨슬리브", "드레이프 슬리브", "퍼프슬리브"]
+    ALLOWED_KEYWORDS = ["럭셔리", "드라마틱", "클래식", "우아한", "로맨틱", "빈티지", "모던", "미니멀", "귀여운", "볼륨", "포멀", "로얄", "시크", "도시적인"]
+    ALLOWED_DETAILS = ["비즈", "시퀸", "긴 트레인", "드레이핑", "코르셋", "일루전 백", "아플리케 레이스", "리본", "러플", "레이어드 스커트"]
+    ALLOWED_DRESS_LENGTHS = ["종아리 길이", "발목 길이", "스윕 트레인(바닥 닿는 길이)", "채플 트레인(살짝 끌림)", "채플 트레인(뒤가 약간 끌림)", "캐트럴 트레인(뒤가 길게 끌림)", "미니", "무릎 길이"]
+    
+    # 한국어 -> 영문 변환 맵 (ID 생성용)
+    KOREAN_TO_ENGLISH = {
+        # 라인
+        "티렝스": "tiered",
+        "미니": "mini",
+        "A라인": "a-line",
+        "엠파이어라인": "empire-line",
+        "시스": "sheath",
+        "H라인": "h-line",
+        "머메이드": "mermaid",
+        "벨라인": "ball-line",
+        "볼가운": "ballgown",
+        "프린세스라인": "princess-line",
+        # 소재
+        "비즈": "bead",
+        "새틴": "satin",
+        "미카도실크": "mikado-silk",
+        "오간자": "organza",
+        "레이스": "lace",
+        "쉬폰": "chiffon",
+        "튤(망사)": "tulle",
+        "도비실크": "dobby-silk",
+        "크레이프": "crepe",
+        # 디테일
+        "시퀸": "sequin",
+        "긴 트레인": "long-train",
+        "드레이핑": "draping",
+        "코르셋": "corset",
+        "일루전 백": "illusion-back",
+        "아플리케 레이스": "applique-lace",
+        "리본": "ribbon",
+        "러플": "ruffle",
+        "레이어드 스커트": "layered-skirt",
+    }
+
     def __init__(self, api_key: str = None):
         """
         초기화
@@ -35,6 +79,9 @@ class DressPromptGenerator:
             )
 
         self.client = anthropic.Anthropic(api_key=self.api_key)
+        # 모델명을 환경변수로 설정 가능하게 하고, 기본값을 Claude Haiku 4.5로 지정
+        # 참고: 환경변수 ANTHROPIC_MODEL이 설정되어 있으면 이를 우선 사용합니다.
+        self.model = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
     def encode_image(self, image_path: str) -> tuple[str, str]:
         """
@@ -62,6 +109,113 @@ class DressPromptGenerator:
 
         return image_data, media_type
 
+    def validate_schema(self, schema: Dict[str, Any]) -> tuple[bool, List[str]]:
+        """
+        스키마가 규칙에 맞는지 검증
+
+        Args:
+            schema: 검증할 스키마 딕셔너리
+
+        Returns:
+            (is_valid, errors) 튜플 - is_valid는 규칙 준수 여부, errors는 오류 메시지 리스트
+        """
+        import re
+        errors: List[str] = []
+
+        # id 검증: 영문 언더스코어 형식 (알파벳, 숫자, 언더스코어, 하이픈만 허용)
+        schema_id = schema.get("id", "")
+        if not schema_id:
+            errors.append("id 필드가 없습니다.")
+        elif not isinstance(schema_id, str):
+            errors.append(f"id는 문자열이어야 합니다. 현재: {type(schema_id)}")
+        else:
+            if not re.match(r'^[a-zA-Z0-9_-]+$', schema_id):
+                errors.append(f"id는 영문, 숫자, 언더스코어(_), 하이픈(-)만 사용 가능합니다. 현재: {schema_id}")
+
+        # name 검증: "라인_디테일(있을경우)_소재 드레스" 형식
+        name = schema.get("name", "")
+        if not name:
+            errors.append("name 필드가 없습니다.")
+        elif not isinstance(name, str):
+            errors.append(f"name은 문자열이어야 합니다. 현재: {type(name)}")
+        else:
+            if not name.endswith(" 드레스"):
+                errors.append(f"name은 ' 드레스'로 끝나야 합니다. 현재: {name}")
+            # 언더스코어로 구분되어 있는지 확인 (최소 2개: 라인_소재, 최대 3개: 라인_디테일_소재)
+            parts = name.replace(" 드레스", "").split("_")
+            if len(parts) < 2 or len(parts) > 3:
+                errors.append(f"name은 '라인_소재 드레스' 또는 '라인_디테일_소재 드레스' 형식이어야 합니다. 현재: {name}")
+
+        # color 검증: 문자열이고 비어있지 않아야 함
+        color = schema.get("color", "")
+        if not isinstance(color, str):
+            errors.append(f"color는 문자열이어야 합니다. 현재: {type(color)}")
+        elif not color:
+            errors.append("color는 비어있을 수 없습니다.")
+
+        # 배열 필드 검증: 허용 어휘 목록에 있는지 확인
+        array_fields = {
+            "line": (schema.get("line", []), self.ALLOWED_LINES),
+            "material": (schema.get("material", []), self.ALLOWED_MATERIALS),
+            "neckline": (schema.get("neckline", []), self.ALLOWED_NECKLINES),
+            "sleeve": (schema.get("sleeve", []), self.ALLOWED_SLEEVES),
+            "keyword": (schema.get("keyword", []), self.ALLOWED_KEYWORDS),
+            "detail": (schema.get("detail", []), self.ALLOWED_DETAILS),
+            "dress_lengths": (schema.get("dress_lengths", []), self.ALLOWED_DRESS_LENGTHS),
+        }
+
+        for field_name, (values, allowed_list) in array_fields.items():
+            if not isinstance(values, list):
+                errors.append(f"{field_name}는 리스트여야 합니다. 현재: {type(values)}")
+                continue
+            
+            for value in values:
+                if not isinstance(value, str):
+                    errors.append(f"{field_name}의 값은 모두 문자열이어야 합니다. 현재: {value} ({type(value)})")
+                elif value not in allowed_list:
+                    errors.append(f"{field_name}의 '{value}'는 허용 어휘 목록에 없습니다. 허용 목록: {allowed_list}")
+
+        return len(errors) == 0, errors
+
+    def normalize_schema(self, schema: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        스키마를 규칙에 맞게 정규화 (자동 수정)
+
+        Args:
+            schema: 정규화할 스키마 딕셔너리
+
+        Returns:
+            정규화된 스키마 딕셔너리
+        """
+        import re
+        normalized = schema.copy()
+
+        # id 형식 정규화: 공백을 언더스코어로, 소문자로 변환, 특수문자 제거
+        if normalized.get("id"):
+            normalized["id"] = re.sub(r'[^a-zA-Z0-9_-]', '_', normalized["id"]).lower()
+        
+        # name 형식 정규화: 끝에 " 드레스" 추가 (없는 경우)
+        # 주의: name은 자동 생성 함수에서 생성되므로 여기서는 형식만 확인
+        if normalized.get("name") and not normalized["name"].endswith(" 드레스"):
+            normalized["name"] = normalized["name"] + " 드레스"
+
+        # 배열 필드에서 허용되지 않은 값 제거
+        array_fields = {
+            "line": self.ALLOWED_LINES,
+            "material": self.ALLOWED_MATERIALS,
+            "neckline": self.ALLOWED_NECKLINES,
+            "sleeve": self.ALLOWED_SLEEVES,
+            "keyword": self.ALLOWED_KEYWORDS,
+            "detail": self.ALLOWED_DETAILS,
+            "dress_lengths": self.ALLOWED_DRESS_LENGTHS,
+        }
+
+        for field_name, allowed_list in array_fields.items():
+            if field_name in normalized and isinstance(normalized[field_name], list):
+                normalized[field_name] = [v for v in normalized[field_name] if v in allowed_list]
+
+        return normalized
+
     def analyze_dress_image(self, image_path: str) -> Dict[str, Any]:
         """
         드레스 이미지를 분석하여 프롬프트와 스키마 생성
@@ -79,41 +233,55 @@ class DressPromptGenerator:
         image_data, media_type = self.encode_image(image_path)
 
         # Claude API를 사용하여 이미지 분석
-        prompt = """이 드레스 이미지를 상세히 분석하여 다음 두 가지를 생성해주세요:
+        prompt = """이 드레스 이미지를 상세히 분석하여 다음을 생성해주세요:
 
-1. **이미지 프롬프트**: 드레스를 재현할 수 있는 상세한 영문 설명
-   - 소재, 색상, 실루엣, 넥라인, 소매, 장식 등을 포함
-   - 예시: "an elegant off-shoulder wedding gown made of ivory tulle and shimmering lace fabric. The dress features a sweetheart neckline with soft floral appliqué and layered off-shoulder sleeves, a structured corset bodice decorated with beaded embroidery, and a voluminous A-line skirt covered with delicate sequins and floral lace patterns."
+# 프롬프트 생성 로직은 당분간 사용하지 않음 (주석처리)
+# 1. **이미지 프롬프트**: 드레스를 재현할 수 있는 상세한 영문 설명
+#    - 소재, 색상, 실루엣, 넥라인, 소매, 장식 등을 포함
+#    - 예시: "an elegant off-shoulder wedding gown made of ivory tulle and shimmering lace fabric. The dress features a sweetheart neckline with soft floral appliqué and layered off-shoulder sleeves, a structured corset bodice decorated with beaded embroidery, and a voluminous A-line skirt covered with delicate sequins and floral lace patterns."
 
-2. **스키마**: 아래 구조에 맞춰 JSON 형식으로 작성
-   - name: 드레스 이름 (예: "Mermaid_off-shoulder_silk_longsleeve") - 라인_넥라인_소재_소매 형식
-   - line: 드레스 라인 태그 배열 (예: ["A-line"], ["Mermaid"], ["Ball gown"], ["Sheath"])
-   - material: 소재 태그 배열 (예: ["Lace", "Tulle"], ["Silk"], ["Satin", "Organza"])
-   - color: 색상 (예: "Ivory", "White", "Blush")
-   - neckline: 넥라인 태그 배열 (예: ["Off-shoulder"], ["Sweetheart"], ["V-neck"], ["High neck"])
-   - sleeve: 소매 태그 배열 (예: ["Long sleeve"], ["Sleeveless"], ["Cap sleeve"], ["Puff sleeve"])
-   - keyword: 키워드 태그 배열 (예: ["Romantic", "Vintage", "Modern", "Elegant"])
-   - detail: 디테일 태그 배열 (예: ["Beaded", "Embroidered", "Floral appliqué", "Sequins"])
+스키마: 아래 JSON 구조에 맞춰 한국어 태그만 사용해 작성하세요.
+   - 중요 규칙 (반드시 지켜야 함):
+     - id: name과 동일한 규칙으로 영문으로 작성하세요. 파일명으로 사용되므로 공백은 언더스코어(_)로, 특수문자는 피하세요.
+       name이 "A라인_비즈_새틴 드레스"이면 id는 "a-line_bead_satin" 형식입니다.
+       예시: "a-line_bead_satin", "sheath_satin"
+     - 아래 제공된 허용 어휘 목록에서만 선택해 정확히 같은 단어와 띄어쓰기를 사용하세요.
+     - 허용 목록에 없는 단어, 변형, 동의어, 영어 사용 금지 (id 제외).
+     - 배열 항목 순서는 중요하지 않으나, 의미 중복은 피하세요.
+     - color는 한국어 단일 문자열로 작성하세요. 예: "화이트", "아이보리", "블러쉬".
+     - name 형식은 반드시 "라인_소재 드레스" 또는 "라인_디테일_소재 드레스"로 작성하세요.
+       디테일이 있을 경우 대표적인 디테일 1개만 사용하세요.
+       예시: "A라인_비즈_새틴 드레스", "시스_새틴 드레스"
 
-응답은 반드시 아래 JSON 형식으로 해주세요:
+허용 어휘:
+- lines: ["티렝스", "미니", "A라인", "엠파이어라인", "시스", "H라인", "머메이드", "벨라인", "볼가운", "프린세스라인"]
+- materials: ["비즈", "새틴", "미카도실크", "오간자", "레이스", "쉬폰", "튤(망사)", "도비실크", "크레이프"]
+- necklines: ["브이넥", "하트넥", "오프숄더", "하이넥", "보트넥", "스퀘어넥", "일루전 넥", "스트레이트 어크로스", "언밸런스"]
+- sleeves: ["롱슬리브", "7부", "숏슬리브", "일루전슬리브", "비숍슬리브", "벨슬리브", "드레이프 슬리브", "퍼프슬리브"]
+- keywords: ["럭셔리", "드라마틱", "클래식", "우아한", "로맨틱", "빈티지", "모던", "미니멀", "귀여운", "볼륨", "포멀", "로얄", "시크", "도시적인"]
+- details: ["비즈", "시퀸", "긴 트레인", "드레이핑", "코르셋", "일루전 백", "아플리케 레이스", "리본", "러플", "레이어드 스커트"]
+- dress_lengths: ["종아리 길이", "발목 길이", "스윕 트레인(바닥 닿는 길이)", "채플 트레인(살짝 끌림)", "채플 트레인(뒤가 약간 끌림)", "캐트럴 트레인(뒤가 길게 끌림)", "미니", "무릎 길이"]
+
+응답은 반드시 아래 JSON 형식으로만 출력하세요(설명 금지):
 {
-  "prompt": "상세한 영문 프롬프트...",
+  "prompt": "",
   "schema": {
-    "name": "드레스_이름",
-    "line": ["라인"],
-    "material": ["소재1", "소재2"],
-    "color": "색상",
-    "neckline": ["넥라인"],
-    "sleeve": ["소매"],
-    "keyword": ["키워드1", "키워드2"],
-    "detail": ["디테일1", "디테일2"]
+    "id": "sheath_v-neck_3quarter_crepe",
+    "name": "A라인_비즈_새틴 드레스",
+    "line": ["허용된 lines 값들"],
+    "material": ["허용된 materials 값들"],
+    "color": "화이트",
+    "neckline": ["허용된 necklines 값들"],
+    "sleeve": ["허용된 sleeves 값들"],
+    "keyword": ["허용된 keywords 값들"],
+    "detail": ["허용된 details 값들"],
+    "dress_lengths": ["허용된 dress_lengths 값들"]
   }
 }
-
-JSON 형식만 출력하고, 다른 설명은 포함하지 마세요."""
+"""
 
         message = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model=self.model,
             max_tokens=2048,
             messages=[
                 {
@@ -151,6 +319,26 @@ JSON 형식만 출력하고, 다른 설명은 포함하지 마세요."""
 
         try:
             result = json.loads(response_text)
+            
+            # 프롬프트 생성 로직은 당분간 사용하지 않음 (주석처리)
+            # prompt가 없으면 빈 문자열로 설정
+            if "prompt" not in result:
+                result["prompt"] = ""
+            
+            # 스키마 검증 및 정규화
+            schema = result.get("schema", {})
+            if schema:
+                # 먼저 정규화 수행
+                result["schema"] = self.normalize_schema(schema)
+                
+                # 검증 수행
+                is_valid, errors = self.validate_schema(result["schema"])
+                if not is_valid:
+                    error_msg = "스키마 검증 실패:\n" + "\n".join(f"  - {e}" for e in errors)
+                    print(f"경고: {error_msg}")
+                    print(f"정규화된 스키마: {json.dumps(result['schema'], ensure_ascii=False, indent=2)}")
+                    # 검증 실패해도 정규화된 결과는 반환 (경고만 출력)
+            
             return result
         except json.JSONDecodeError as e:
             print(f"JSON 파싱 오류: {e}")
