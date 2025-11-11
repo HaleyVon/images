@@ -356,6 +356,33 @@ def main() -> None:
                 schema = current_record.get("schema", {})
                 file_path = current_record.get("file_path", "")
                 
+                # 이미지 네비게이션
+                col_nav_prev, col_nav_slider, col_nav_next = st.columns([1, 8, 1])
+                
+                with col_nav_prev:
+                    if st.button("◀", key="nav_prev", disabled=(current_index == 0), use_container_width=True):
+                        st.session_state["edit_image_index"] = current_index - 1
+                        st.rerun()
+                
+                with col_nav_slider:
+                    selected_index = st.slider(
+                        "이미지 선택",
+                        min_value=0,
+                        max_value=len(edit_records) - 1,
+                        value=current_index,
+                        format=f"%d / {len(edit_records)}",
+                        key="image_slider",
+                        label_visibility="collapsed"
+                    )
+                    if selected_index != current_index:
+                        st.session_state["edit_image_index"] = selected_index
+                        st.rerun()
+                
+                with col_nav_next:
+                    if st.button("▶", key="nav_next", disabled=(current_index >= len(edit_records) - 1), use_container_width=True):
+                        st.session_state["edit_image_index"] = current_index + 1
+                        st.rerun()
+                
                 # 진행 상황 표시
                 st.progress((current_index + 1) / len(edit_records))
                 st.caption(f"진행 상황: {current_index + 1} / {len(edit_records)}")
@@ -424,7 +451,7 @@ def main() -> None:
                         st.session_state[dress_lengths_key] = set(current_dress_lengths)
                     
                     # 기본 정보 편집
-                    col_title, col_regenerate = st.columns([3, 1])
+                    col_title, col_regenerate, col_approve_top = st.columns([2, 1, 1])
                     with col_title:
                         st.markdown("**기본 정보**")
                     with col_regenerate:
@@ -463,6 +490,9 @@ def main() -> None:
                                 st.rerun()
                             else:
                                 st.warning("라인과 소재를 선택해주세요.")
+                    with col_approve_top:
+                        approve_top_key = f"approve_top_{current_index}"
+                        top_approve_clicked = st.button("✅ 승인", key=approve_top_key, type="primary", use_container_width=True)
                     
                     # name과 id 자동 생성 (미리보기)
                     selected_line = list(st.session_state[line_key])
@@ -497,43 +527,69 @@ def main() -> None:
                     id_input_key = f"edit_id_{current_index}"
                     name_input_key = f"edit_name_{current_index}"
                     
-                    # ID 입력 필드 (자동 생성 안내)
-                    edited_id = st.text_input(
-                        "ID (자동 생성됨, 수정 가능)",
-                        value=st.session_state.get(id_input_key, schema.get("id", auto_id)),
-                        key=id_input_key,
-                        help=f"자동 생성: {auto_id if auto_id else '라인과 소재를 선택하면 자동 생성됩니다'}"
-                    )
+                    # ID와 이름을 컬럼으로 배치
+                    col_id, col_name, col_color = st.columns(3)
+                    with col_id:
+                        # 초기값 설정: 세션 상태에 없으면 스키마 또는 자동 생성값 사용
+                        if id_input_key not in st.session_state:
+                            st.session_state[id_input_key] = schema.get("id", auto_id)
+                        st.text_input(
+                            "ID (자동 생성됨, 수정 가능)",
+                            key=id_input_key,
+                            help=f"자동 생성: {auto_id if auto_id else '라인과 소재를 선택하면 자동 생성됩니다'}"
+                        )
+                    with col_name:
+                        # 초기값 설정: 세션 상태에 없으면 스키마 또는 자동 생성값 사용
+                        if name_input_key not in st.session_state:
+                            st.session_state[name_input_key] = schema.get("name", auto_name)
+                        st.text_input(
+                            "이름 (자동 생성됨, 수정 가능)",
+                            key=name_input_key,
+                            help=f"자동 생성: {auto_name if auto_name else '라인과 소재를 선택하면 자동 생성됩니다'}"
+                        )
+                    with col_color:
+                        color_input_key = f"edit_color_{current_index}"
+                        # 초기값 설정: 세션 상태에 없으면 스키마에서 가져오기
+                        if color_input_key not in st.session_state:
+                            st.session_state[color_input_key] = schema.get("color", "")
+                        st.text_input(
+                            "색상",
+                            key=color_input_key
+                        )
                     
-                    # 이름 입력 필드 (자동 생성 안내)
-                    edited_name = st.text_input(
-                        "이름 (자동 생성됨, 수정 가능)",
-                        value=st.session_state.get(name_input_key, schema.get("name", auto_name)),
-                        key=name_input_key,
-                        help=f"자동 생성: {auto_name if auto_name else '라인과 소재를 선택하면 자동 생성됩니다'}"
-                    )
+                    # 세션 상태에서 실제 값 가져오기
+                    edited_id = st.session_state.get(id_input_key, "")
+                    edited_name = st.session_state.get(name_input_key, "")
+                    edited_color = st.session_state.get(color_input_key, "")
                     
-                    edited_color = st.text_input(
-                        "색상",
-                        value=schema.get("color", ""),
-                        key=f"edit_color_{current_index}"
-                    )
-                    
-                    st.divider()
-                    
-                    # CSS 스타일 추가 (버튼 간격 줄이기)
+                    # CSS 스타일 추가 (버튼 크기 및 간격 줄이기)
                     st.markdown("""
                     <style>
                     .stButton > button {
-                        margin: 0.2rem 0.3rem;
-                        padding: 0.4rem 0.8rem;
-                        font-size: 0.9rem;
+                        margin: 0.1rem 0.1rem !important;
+                        padding: 0.1rem 0.1rem !important;
+                        font-size: 0.7rem !important;
+                        min-height: 1.0rem !important;
+                        height: auto !important;
+                    }
+                    .stButton > button p {
+                        font-size: 0.7rem !important;
+                    }
+                    .stButton > button div {
+                        font-size: 0.7rem !important;
+                    }
+                    div[data-testid="column"] {
+                        padding: 0.1rem !important;
+                    }
+                    button[kind="primary"], button[kind="secondary"] {
+                        font-size: 0.7rem !important;
+                        padding: 0.1rem 0.1rem !important;
                     }
                     </style>
                     """, unsafe_allow_html=True)
                     
                     # Line 필드 (1개만 선택)
-                    st.markdown("**라인** (1개 선택)")
+                    st.markdown("<p style='margin-bottom:0.3rem; font-size:0.9rem;'><strong>라인</strong> (1개 선택)</p>", unsafe_allow_html=True)
                     cols_line = st.columns(8)
                     for idx, value in enumerate(allowed_lines):
                         with cols_line[idx % 8]:
@@ -554,7 +610,7 @@ def main() -> None:
                                 st.rerun()
                     
                     # Material 필드 (1~2개 선택)
-                    st.markdown("**소재** (1~2개 선택)")
+                    st.markdown("<p style='margin-bottom:0.3rem; font-size:0.9rem;'><strong>소재</strong> (1~2개 선택)</p>", unsafe_allow_html=True)
                     cols_material = st.columns(8)
                     for idx, value in enumerate(allowed_materials):
                         with cols_material[idx % 8]:
@@ -582,7 +638,7 @@ def main() -> None:
                                 st.rerun()
                     
                     # Neckline 필드 (1개만 선택)
-                    st.markdown("**넥라인** (1개 선택)")
+                    st.markdown("<p style='margin-bottom:0.3rem; font-size:0.9rem;'><strong>넥라인</strong> (1개 선택)</p>", unsafe_allow_html=True)
                     cols_neckline = st.columns(8)
                     for idx, value in enumerate(allowed_necklines):
                         with cols_neckline[idx % 8]:
@@ -603,7 +659,7 @@ def main() -> None:
                                 st.rerun()
                     
                     # Sleeve 필드 (1개만 선택)
-                    st.markdown("**소매** (1개 선택)")
+                    st.markdown("<p style='margin-bottom:0.3rem; font-size:0.9rem;'><strong>소매</strong> (1개 선택)</p>", unsafe_allow_html=True)
                     cols_sleeve = st.columns(8)
                     for idx, value in enumerate(allowed_sleeves):
                         with cols_sleeve[idx % 8]:
@@ -624,7 +680,7 @@ def main() -> None:
                                 st.rerun()
                     
                     # Keyword 필드 (1~3개 선택)
-                    st.markdown("**키워드** (1~3개 선택)")
+                    st.markdown("<p style='margin-bottom:0.3rem; font-size:0.9rem;'><strong>키워드</strong> (1~3개 선택)</p>", unsafe_allow_html=True)
                     cols_keyword = st.columns(8)
                     for idx, value in enumerate(allowed_keywords):
                         with cols_keyword[idx % 8]:
@@ -652,7 +708,7 @@ def main() -> None:
                                 st.rerun()
                     
                     # Detail 필드 (0~3개 선택)
-                    st.markdown("**디테일** (0~3개 선택)")
+                    st.markdown("<p style='margin-bottom:0.3rem; font-size:0.9rem;'><strong>디테일</strong> (0~3개 선택)</p>", unsafe_allow_html=True)
                     cols_detail = st.columns(8)
                     for idx, value in enumerate(allowed_details):
                         with cols_detail[idx % 8]:
@@ -679,7 +735,7 @@ def main() -> None:
                                 st.rerun()
                     
                     # Dress Lengths 필드 (1개만 선택)
-                    st.markdown("**드레스 길이** (1개 선택)")
+                    st.markdown("<p style='margin-bottom:0.3rem; font-size:0.9rem;'><strong>드레스 길이</strong> (1개 선택)</p>", unsafe_allow_html=True)
                     cols_dress_lengths = st.columns(8)
                     for idx, value in enumerate(allowed_dress_lengths):
                         with cols_dress_lengths[idx % 8]:
@@ -702,7 +758,16 @@ def main() -> None:
                     st.divider()
                     
                     # 승인 버튼
-                    if st.button("승인하고 다음으로", type="primary", use_container_width=True):
+                    bottom_approve_clicked = st.button("승인하고 다음으로", type="primary", use_container_width=True)
+                    
+                    if bottom_approve_clicked or top_approve_clicked:
+                        
+                        # 세션 상태에서 입력값 가져오기
+                        color_input_key = f"edit_color_{current_index}"
+                        current_edited_id = st.session_state.get(id_input_key, "")
+                        current_edited_name = st.session_state.get(name_input_key, "")
+                        current_edited_color = st.session_state.get(color_input_key, "")
+                        
                         # 라인, 디테일, 소재 확인
                         selected_line = list(st.session_state[line_key])
                         selected_detail = list(st.session_state[detail_key])
@@ -739,13 +804,15 @@ def main() -> None:
                         )
                         
                         # 사용자가 수동으로 입력한 경우도 확인 (빈 값이면 자동 생성된 값 사용)
-                        final_name = edited_name.strip() if edited_name.strip() else auto_name
-                        final_id = edited_id.strip() if edited_id.strip() else auto_id
+                        final_name = current_edited_name.strip() if current_edited_name.strip() else auto_name
+                        final_id = current_edited_id.strip() if current_edited_id.strip() else auto_id
+                        
+                        # 원본 ID 저장 (중복 처리 전)
+                        base_id = final_id
                         
                         # ID 중복 확인 및 넘버링 추가 (수동 입력한 경우도 처리)
                         if final_id in existing_ids:
                             counter = 1
-                            base_id = final_id
                             while final_id in existing_ids:
                                 final_id = f"{base_id}_{counter:02d}"
                                 counter += 1
@@ -754,7 +821,7 @@ def main() -> None:
                         updated_schema = {
                             "id": final_id,
                             "name": final_name,
-                            "color": edited_color,
+                            "color": current_edited_color,
                             "line": selected_line,
                             "material": selected_material,
                             "neckline": list(st.session_state[neckline_key]),
@@ -807,7 +874,8 @@ def main() -> None:
                         st.session_state["edit_image_index"] = current_index + 1
                         
                         # 세션 상태 초기화 (다음 이미지 준비)
-                        for key in [line_key, material_key, neckline_key, sleeve_key, keyword_key, detail_key, dress_lengths_key]:
+                        color_input_key = f"edit_color_{current_index}"
+                        for key in [line_key, material_key, neckline_key, sleeve_key, keyword_key, detail_key, dress_lengths_key, id_input_key, name_input_key, color_input_key]:
                             if key in st.session_state:
                                 del st.session_state[key]
                         
@@ -977,22 +1045,16 @@ def main() -> None:
         
         col1, col2 = st.columns([0.1, 0.9])
         with col1:
-            # 체크박스의 value를 세션 상태와 동기화
-            checkbox_value = st.session_state.get(f"checkbox_{row_id}", is_selected)
-            # 세션 상태와 일치하지 않으면 업데이트
-            if checkbox_value != is_selected:
-                checkbox_value = is_selected
-                st.session_state[f"checkbox_{row_id}"] = is_selected
+            # 체크박스의 현재 상태 (세션 상태와 동기화)
+            checkbox_key = f"checkbox_{row_id}"
+            checkbox_is_checked = st.checkbox("선택", value=is_selected, key=checkbox_key, label_visibility="collapsed")
             
-            checkbox_changed = st.checkbox("", value=checkbox_value, key=f"checkbox_{row_id}")
-            
-            if checkbox_changed:
-                if row_id not in st.session_state["selected_rows"]:
-                    st.session_state["selected_rows"].add(row_id)
+            # 체크박스 상태에 따라 세션 상태 업데이트
+            if checkbox_is_checked:
+                st.session_state["selected_rows"].add(row_id)
                 selected_ids.append(row_id)
             else:
-                if row_id in st.session_state["selected_rows"]:
-                    st.session_state["selected_rows"].remove(row_id)
+                st.session_state["selected_rows"].discard(row_id)
         
         with col2:
             if view_mode == "플랫":

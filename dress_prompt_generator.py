@@ -22,12 +22,12 @@ class DressPromptGenerator:
 
     # 허용 어휘 목록 (시스템 검증용)
     ALLOWED_LINES = ["티렝스", "미니", "A라인", "엠파이어라인", "시스", "H라인", "머메이드", "벨라인", "볼가운", "프린세스라인"]
-    ALLOWED_MATERIALS = ["비즈", "새틴", "미카도실크", "오간자", "레이스", "쉬폰", "튤(망사)", "도비실크", "크레이프"]
-    ALLOWED_NECKLINES = ["브이넥", "하트넥", "오프숄더", "하이넥", "보트넥", "스퀘어넥", "일루전 넥", "스트레이트 어크로스", "언밸런스"]
-    ALLOWED_SLEEVES = ["롱슬리브", "7부", "숏슬리브", "일루전슬리브", "비숍슬리브", "벨슬리브", "드레이프 슬리브", "퍼프슬리브"]
+    ALLOWED_MATERIALS = ["비즈", "새틴", "미카도실크", "오간자", "레이스", "쉬폰", "튤(망사)", "도비실크", "크레이프", "타프타실크"]
+    ALLOWED_NECKLINES = ["브이넥", "하트넥", "오프숄더", "하이넥", "보트넥", "스퀘어넥", "일루전 넥", "스트레이트 어크로스", "언밸런스", "홀터넥"]
+    ALLOWED_SLEEVES = ["슬리브리스", "롱슬리브", "7부", "숏슬리브", "일루전슬리브", "비숍슬리브", "벨슬리브", "드레이프 슬리브", "퍼프슬리브"]
     ALLOWED_KEYWORDS = ["럭셔리", "드라마틱", "클래식", "우아한", "로맨틱", "빈티지", "모던", "미니멀", "귀여운", "볼륨", "포멀", "로얄", "시크", "도시적인"]
-    ALLOWED_DETAILS = ["비즈", "시퀸", "긴 트레인", "드레이핑", "코르셋", "일루전 백", "아플리케 레이스", "리본", "러플", "레이어드 스커트"]
-    ALLOWED_DRESS_LENGTHS = ["종아리 길이", "발목 길이", "스윕 트레인(바닥 닿는 길이)", "채플 트레인(살짝 끌림)", "채플 트레인(뒤가 약간 끌림)", "캐트럴 트레인(뒤가 길게 끌림)", "미니", "무릎 길이"]
+    ALLOWED_DETAILS = ["비즈", "시퀸", "긴 트레인", "드레이핑", "코르셋", "일루전 백", "아플리케 레이스", "리본", "러플", "레이어드 스커트", "플리츠"]
+    ALLOWED_DRESS_LENGTHS = ["종아리 길이", "발목 길이", "스윕 트레인(바닥 닿는 길이)", "채플 트레인(뒤가 약간 끌림)", "캐시드럴 트레인(뒤가 길게 끌림)", "미니", "무릎 길이"]
     
     # 한국어 -> 영문 변환 맵 (ID 생성용)
     KOREAN_TO_ENGLISH = {
@@ -52,6 +52,43 @@ class DressPromptGenerator:
         "튤(망사)": "tulle",
         "도비실크": "dobby-silk",
         "크레이프": "crepe",
+        "타프타실크": "taffeta-silk",
+        # 넥라인
+        "브이넥": "v-neck",
+        "하트넥": "heart-neck",
+        "오프숄더": "off-shoulder",
+        "하이넥": "high-neck",
+        "보트넥": "boat-neck",
+        "스퀘어넥": "square-neck",
+        "일루전 넥": "illusion-neck",
+        "스트레이트 어크로스": "straight-across",
+        "언밸런스": "unbalance",
+        "홀터넥": "halter-neck",
+        # 소매
+        "슬리브리스": "sleeveless",
+        "롱슬리브": "long-sleeve",
+        "7부": "three-quarter",
+        "숏슬리브": "short-sleeve",
+        "일루전슬리브": "illusion-sleeve",
+        "비숍슬리브": "bishop-sleeve",
+        "벨슬리브": "bell-sleeve",
+        "드레이프 슬리브": "drape-sleeve",
+        "퍼프슬리브": "puff-sleeve",
+        # 키워드
+        "럭셔리": "luxury",
+        "드라마틱": "dramatic",
+        "클래식": "classic",
+        "우아한": "elegant",
+        "로맨틱": "romantic",
+        "빈티지": "vintage",
+        "모던": "modern",
+        "미니멀": "minimal",
+        "귀여운": "cute",
+        "볼륨": "volume",
+        "포멀": "formal",
+        "로얄": "royal",
+        "시크": "chic",
+        "도시적인": "urban",
         # 디테일
         "시퀸": "sequin",
         "긴 트레인": "long-train",
@@ -62,6 +99,14 @@ class DressPromptGenerator:
         "리본": "ribbon",
         "러플": "ruffle",
         "레이어드 스커트": "layered-skirt",
+        "플리츠": "pleats",
+        # 드레스 길이
+        "종아리 길이": "calf-length",
+        "발목 길이": "ankle-length",
+        "스윕 트레인(바닥 닿는 길이)": "sweep-train",
+        "채플 트레인(뒤가 약간 끌림)": "chapel-train",
+        "캐시드럴 트레인(뒤가 길게 끌림)": "cathedral-train",
+        "무릎 길이": "knee-length",
     }
 
     def __init__(self, api_key: str = None):
@@ -174,6 +219,17 @@ class DressPromptGenerator:
                     errors.append(f"{field_name}의 값은 모두 문자열이어야 합니다. 현재: {value} ({type(value)})")
                 elif value not in allowed_list:
                     errors.append(f"{field_name}의 '{value}'는 허용 어휘 목록에 없습니다. 허용 목록: {allowed_list}")
+        
+        # 개수 제한 검증
+        dress_lengths = schema.get("dress_lengths", [])
+        if isinstance(dress_lengths, list):
+            if len(dress_lengths) != 1:
+                errors.append(f"dress_lengths는 정확히 1개만 선택해야 합니다. 현재: {len(dress_lengths)}개")
+        
+        keyword = schema.get("keyword", [])
+        if isinstance(keyword, list):
+            if len(keyword) < 1 or len(keyword) > 3:
+                errors.append(f"keyword는 1~3개만 선택해야 합니다. 현재: {len(keyword)}개")
 
         return len(errors) == 0, errors
 
@@ -213,6 +269,25 @@ class DressPromptGenerator:
         for field_name, allowed_list in array_fields.items():
             if field_name in normalized and isinstance(normalized[field_name], list):
                 normalized[field_name] = [v for v in normalized[field_name] if v in allowed_list]
+        
+        # 개수 제한 적용
+        # dress_lengths: 정확히 1개만 허용
+        if "dress_lengths" in normalized and isinstance(normalized["dress_lengths"], list):
+            if len(normalized["dress_lengths"]) > 1:
+                print(f"경고: dress_lengths는 1개만 선택 가능합니다. {len(normalized['dress_lengths'])}개 중 가장 근접한 한 개만 유지합니다.")
+                normalized["dress_lengths"] = [normalized["dress_lengths"][0]]
+            elif len(normalized["dress_lengths"]) == 0:
+                print(f"경고: dress_lengths가 비어있습니다. 기본값 '발목 길이'를 설정합니다.")
+                normalized["dress_lengths"] = ["발목 길이"]
+        
+        # keyword: 1~3개만 허용
+        if "keyword" in normalized and isinstance(normalized["keyword"], list):
+            if len(normalized["keyword"]) > 3:
+                print(f"경고: keyword는 최대 3개까지만 선택 가능합니다. {len(normalized['keyword'])}개 중 가장 근접한 세 개만 유지합니다.")
+                normalized["keyword"] = normalized["keyword"][:3]
+            elif len(normalized["keyword"]) == 0:
+                print(f"경고: keyword가 비어있습니다. 기본값 '우아한'을 설정합니다.")
+                normalized["keyword"] = ["우아한"]
 
         return normalized
 
@@ -235,11 +310,6 @@ class DressPromptGenerator:
         # Claude API를 사용하여 이미지 분석
         prompt = """이 드레스 이미지를 상세히 분석하여 다음을 생성해주세요:
 
-# 프롬프트 생성 로직은 당분간 사용하지 않음 (주석처리)
-# 1. **이미지 프롬프트**: 드레스를 재현할 수 있는 상세한 영문 설명
-#    - 소재, 색상, 실루엣, 넥라인, 소매, 장식 등을 포함
-#    - 예시: "an elegant off-shoulder wedding gown made of ivory tulle and shimmering lace fabric. The dress features a sweetheart neckline with soft floral appliqué and layered off-shoulder sleeves, a structured corset bodice decorated with beaded embroidery, and a voluminous A-line skirt covered with delicate sequins and floral lace patterns."
-
 스키마: 아래 JSON 구조에 맞춰 한국어 태그만 사용해 작성하세요.
    - 중요 규칙 (반드시 지켜야 함):
      - id: name과 동일한 규칙으로 영문으로 작성하세요. 파일명으로 사용되므로 공백은 언더스코어(_)로, 특수문자는 피하세요.
@@ -252,15 +322,18 @@ class DressPromptGenerator:
      - name 형식은 반드시 "라인_소재 드레스" 또는 "라인_디테일_소재 드레스"로 작성하세요.
        디테일이 있을 경우 대표적인 디테일 1개만 사용하세요.
        예시: "A라인_비즈_새틴 드레스", "시스_새틴 드레스"
+     - **개수 제한 (매우 중요)**:
+       * dress_lengths: 정확히 1개만 선택
+       * keyword: 1~3개만 선택 (최대 3개)
 
 허용 어휘:
 - lines: ["티렝스", "미니", "A라인", "엠파이어라인", "시스", "H라인", "머메이드", "벨라인", "볼가운", "프린세스라인"]
-- materials: ["비즈", "새틴", "미카도실크", "오간자", "레이스", "쉬폰", "튤(망사)", "도비실크", "크레이프"]
-- necklines: ["브이넥", "하트넥", "오프숄더", "하이넥", "보트넥", "스퀘어넥", "일루전 넥", "스트레이트 어크로스", "언밸런스"]
-- sleeves: ["롱슬리브", "7부", "숏슬리브", "일루전슬리브", "비숍슬리브", "벨슬리브", "드레이프 슬리브", "퍼프슬리브"]
+- materials: ["비즈", "새틴", "미카도실크", "오간자", "레이스", "쉬폰", "튤(망사)", "도비실크", "크레이프", "타프타실크"]
+- necklines: ["브이넥", "하트넥", "오프숄더", "하이넥", "보트넥", "스퀘어넥", "일루전 넥", "스트레이트 어크로스", "언밸런스", "홀터넥"]
+- sleeves: ["슬리브리스", "롱슬리브", "7부", "숏슬리브", "일루전슬리브", "비숍슬리브", "벨슬리브", "드레이프 슬리브", "퍼프슬리브"]
 - keywords: ["럭셔리", "드라마틱", "클래식", "우아한", "로맨틱", "빈티지", "모던", "미니멀", "귀여운", "볼륨", "포멀", "로얄", "시크", "도시적인"]
-- details: ["비즈", "시퀸", "긴 트레인", "드레이핑", "코르셋", "일루전 백", "아플리케 레이스", "리본", "러플", "레이어드 스커트"]
-- dress_lengths: ["종아리 길이", "발목 길이", "스윕 트레인(바닥 닿는 길이)", "채플 트레인(살짝 끌림)", "채플 트레인(뒤가 약간 끌림)", "캐트럴 트레인(뒤가 길게 끌림)", "미니", "무릎 길이"]
+- details: ["비즈", "시퀸", "긴 트레인", "드레이핑", "코르셋", "일루전 백", "아플리케 레이스", "리본", "러플", "레이어드 스커트", "플리츠"]
+- dress_lengths: ["종아리 길이", "발목 길이", "스윕 트레인(바닥 닿는 길이)", "채플 트레인(뒤가 약간 끌림)", "캐시드럴 트레인(뒤가 길게 끌림)", "미니", "무릎 길이"]
 
 응답은 반드시 아래 JSON 형식으로만 출력하세요(설명 금지):
 {
