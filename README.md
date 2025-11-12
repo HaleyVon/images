@@ -296,18 +296,49 @@ else:
     print(f"실패: {result['error']}")
 ```
 
-### C. Streamlit UI
+### C. 웹 UI (Streamlit)
 
-Streamlit 앱 실행:
+#### 🌟 통합 웹 UI (권장)
+
+드레스 분석 + Virtual Try-On을 한 번에!
+
+```bash
+# 간편 실행 스크립트
+./run_web.sh
+
+# 또는 직접 실행
+streamlit run app_integrated.py
+```
+
+**기능:**
+- ✅ 드레스 이미지 분석 (Claude)
+- ✅ Virtual Try-On (Gemini)
+- ✅ 통합 UI (탭으로 구분)
+- ✅ 실시간 결과 확인
+- ✅ 결과 다운로드
+
+#### Virtual Try-On 전용 UI
+
+```bash
+streamlit run app_tryon.py
+```
+
+#### 드레스 분석 전용 UI
+
 ```bash
 streamlit run app.py
 ```
 
-사용법:
-1. 사이드바에서 API 키 입력
-2. 드레스 이미지 업로드
-3. 자동 분석 또는 수동 분석
-4. 결과 확인 및 관리
+**사용법:**
+1. 웹 브라우저가 자동으로 열립니다 (http://localhost:8501)
+2. 사이드바에서 API 키 입력
+3. 이미지 업로드
+4. 결과 확인 및 다운로드
+
+**팁:**
+- 통합 UI는 모든 기능을 한 곳에서 사용 가능
+- API 키는 `.env` 파일에 저장하면 자동으로 로드됨
+- 여러 이미지를 순차적으로 테스트 가능
 
 ## 배치 처리 예시
 
