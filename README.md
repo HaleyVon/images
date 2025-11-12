@@ -1,13 +1,21 @@
-# 드레스 이미지 프롬프트 생성기 (Dress Image Prompt Generator)
+# 웨딩드레스 AI 시스템 (Wedding Dress AI System)
 
-드레스 이미지를 분석하여 상세한 이미지 프롬프트와 구조화된 스키마를 자동으로 생성하는 AI 기반 도구입니다.
+드레스 이미지를 분석하고 Virtual Try-On 기능을 제공하는 AI 기반 통합 시스템입니다.
 
-## 기능
+## 주요 기능
 
+### 1. 드레스 이미지 분석
 - 🎨 **이미지 분석**: Claude Vision API를 사용하여 드레스 이미지를 상세히 분석
 - 📝 **프롬프트 생성**: 드레스를 재현할 수 있는 상세한 영문 설명 자동 생성
 - 🏷️ **스키마 생성**: 드레스의 라인, 소재, 색상, 넥라인, 소매 등을 구조화된 태그로 분류
-- 💾 **JSON 출력**: 결과를 JSON 형식으로 저장하여 데이터베이스나 다른 시스템과 쉽게 연동
+- 💾 **JSON 출력**: 결과를 JSON 형식으로 저장하여 데이터베이스와 쉽게 연동
+
+### 2. Virtual Try-On (NEW!)
+- 👗 **가상 피팅**: Gemini API를 사용하여 실시간 가상 피팅 기능 제공
+- 💒 **웨딩드레스 특화**: 웨딩드레스에 최적화된 고품질 가상 피팅
+- 🔄 **반복 개선**: Iterative refinement로 품질 향상
+- 🎯 **이미지 검증**: 자동으로 사람 이미지와 의류 이미지 검증
+- 🚀 **REST API**: FastAPI 기반 RESTful API 제공
 
 ## 설치 방법
 
@@ -35,7 +43,7 @@ pip install -r requirements.txt
 
 ### 4. API 키 설정
 
-`.env.example` 파일을 복사하여 `.env` 파일을 생성하고, Anthropic API 키를 설정합니다:
+`.env.example` 파일을 복사하여 `.env` 파일을 생성하고, API 키를 설정합니다:
 
 ```bash
 cp .env.example .env
@@ -44,14 +52,25 @@ cp .env.example .env
 `.env` 파일을 열어서 API 키를 입력:
 
 ```
-ANTHROPIC_API_KEY=your_actual_api_key_here
+# 드레스 분석용
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# Virtual Try-On용
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# API 서버 포트
+PORT=8000
 ```
 
-API 키는 [Anthropic Console](https://console.anthropic.com/)에서 발급받을 수 있습니다.
+API 키 발급:
+- Anthropic API 키: [Anthropic Console](https://console.anthropic.com/)
+- Gemini API 키: [Google AI Studio](https://aistudio.google.com/app/apikey)
 
 ## 사용 방법
 
-### 기본 사용
+### A. 드레스 이미지 분석
+
+#### 기본 사용
 
 ```bash
 python dress_prompt_generator.py <이미지_파일_경로>
@@ -140,6 +159,156 @@ optional arguments:
 - `mermaid_boat_white_dobi.png` - 머메이드 라인, 보트 넥라인
 - `bell_sleeveless_tube_white_silk_lace.png` - 벨 라인, 민소매, 튜브탑
 
+### B. Virtual Try-On
+
+#### CLI 사용
+
+기본 사용법:
+```bash
+python virtual_tryon.py <사람_이미지> <의류_이미지> -o <출력_파일>
+```
+
+예시:
+```bash
+# 기본 모드
+python virtual_tryon.py bride.jpg wedding_dress.jpg -o result.jpg
+
+# 웨딩드레스 모드 (고품질)
+python virtual_tryon.py bride.jpg wedding_dress.jpg -o result.jpg --style wedding
+
+# 반복 개선 모드 (최고 품질)
+python virtual_tryon.py bride.jpg wedding_dress.jpg -o result.jpg --iterative --iterations 3
+```
+
+#### API 서버 실행
+
+```bash
+# 서버 시작
+python api_server.py
+
+# 또는 uvicorn 직접 실행
+uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload
+```
+
+서버가 실행되면 다음 URL에서 API 문서를 확인할 수 있습니다:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+#### API 엔드포인트
+
+##### 1. 사람 이미지 검증
+```bash
+curl -X POST "http://localhost:8000/validate/person" \
+  -F "image=@bride.jpg"
+```
+
+응답:
+```json
+{
+  "success": true,
+  "is_valid": true,
+  "data": {
+    "is_person": true,
+    "description": "young woman, standing, front-facing",
+    "body_visible": true,
+    "pose_suitable": true
+  }
+}
+```
+
+##### 2. 의류 이미지 검증
+```bash
+curl -X POST "http://localhost:8000/validate/clothing" \
+  -F "image=@dress.jpg"
+```
+
+응답:
+```json
+{
+  "success": true,
+  "is_valid": true,
+  "data": {
+    "is_clothing": true,
+    "clothing_type": "wedding dress",
+    "description": "elegant white A-line wedding dress",
+    "color": "white",
+    "pattern": "lace embroidery"
+  }
+}
+```
+
+##### 3. Virtual Try-On (기본)
+```bash
+curl -X POST "http://localhost:8000/try-on" \
+  -F "person_image=@bride.jpg" \
+  -F "clothing_image=@dress.jpg" \
+  -F "style=default"
+```
+
+##### 4. Virtual Try-On (웨딩드레스)
+```bash
+curl -X POST "http://localhost:8000/try-on/wedding" \
+  -F "person_image=@bride.jpg" \
+  -F "clothing_image=@dress.jpg"
+```
+
+##### 5. Virtual Try-On (반복 개선)
+```bash
+curl -X POST "http://localhost:8000/try-on/iterative" \
+  -F "person_image=@bride.jpg" \
+  -F "clothing_image=@dress.jpg" \
+  -F "iterations=2"
+```
+
+응답:
+```json
+{
+  "success": true,
+  "image_base64": "base64_encoded_image_data",
+  "mime_type": "image/jpeg",
+  "person": {...},
+  "clothing": {...},
+  "prompt": "..."
+}
+```
+
+#### Python 스크립트 예시
+
+```python
+from virtual_tryon import VirtualTryOn
+
+# 초기화
+tryon = VirtualTryOn()
+
+# Virtual Try-On 수행
+result = tryon.process_with_validation(
+    person_image_path="bride.jpg",
+    clothing_image_path="wedding_dress.jpg",
+    style="wedding"
+)
+
+if result["success"]:
+    # 이미지 저장
+    with open("output.jpg", "wb") as f:
+        f.write(result["image"])
+    print("성공!")
+else:
+    print(f"실패: {result['error']}")
+```
+
+### C. Streamlit UI
+
+Streamlit 앱 실행:
+```bash
+streamlit run app.py
+```
+
+사용법:
+1. 사이드바에서 API 키 입력
+2. 드레스 이미지 업로드
+3. 자동 분석 또는 수동 분석
+4. 결과 확인 및 관리
+
 ## 배치 처리 예시
 
 여러 이미지를 한 번에 처리하려면 간단한 스크립트를 작성할 수 있습니다:
@@ -175,9 +344,20 @@ FileNotFoundError: 이미지 파일을 찾을 수 없습니다
 
 ## 기술 스택
 
-- **Python 3.7+**
-- **Anthropic Claude API** - 이미지 분석 및 텍스트 생성
+### 백엔드
+- **Python 3.9+**
+- **Anthropic Claude API** - 드레스 이미지 분석 및 텍스트 생성
+- **Google Gemini API** - Virtual Try-On 이미지 생성
+- **FastAPI** - RESTful API 서버
+- **Pydantic** - 데이터 검증
+- **Pillow** - 이미지 처리
+
+### 프론트엔드
+- **Streamlit** - 웹 UI
+
+### 기타
 - **python-dotenv** - 환경변수 관리
+- **uvicorn** - ASGI 서버
 
 ## Streamlit 버전 업그레이드
 
